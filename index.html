@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Closing Cost Estimator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-mode="home">
+<div class="chrome">
+<header class="topbar">
+  <button type="button" class="brand" id="homeBtn" aria-label="Coldwell Banker Closing Cost Estimator, back to start">
+    <img class="cb-logo" src="logos/cb-logo-white-cropped.png" alt="">
+    <span class="appname">Closing Cost Estimator</span>
+  </button>
+  <nav class="mode-switch" id="modeSwitch" aria-label="Choose a sheet">
+    <button type="button" data-mode="buyer"><i class="dot" aria-hidden="true"></i>Buyer Cost Sheet</button>
+    <button type="button" data-mode="seller"><i class="dot" aria-hidden="true"></i>Seller Net Sheet</button>
+  </nav>
+  <div class="topbar-actions">
+    <button type="button" class="btn ghost" id="newDeal">New deal</button>
+  </div>
+</header>
+<div class="keybar" id="keybar" hidden>
+  <div><div class="kl" id="kLabel"></div><div class="kv" id="kValue"></div></div>
+  <div class="ring"><span id="kRing"></span><button type="button" class="leftbtn" id="kLeft"></button></div>
+</div>
+</div>
+<section class="home" id="home">
+  <div class="band">
+    <h1>Which sheet do you need?</h1>
+    <p class="home-sub">Each one is its own short form. Fill it in, check the number, print one page.</p>
+  </div>
+  <div class="home-cards">
+    <button type="button" class="home-card buyer" data-mode="buyer">
+      <span class="home-card-top">
+        <span class="home-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg>
+        </span>
+        <span class="home-tag">For buyers</span>
+      </span>
+      <span class="home-title">Buyer Cost Sheet</span>
+      <span class="home-text">Closing costs, prepaids, cash needed at settlement and the monthly payment.</span>
+      <span class="home-need"><b>You'll need</b>Price, how they're paying, rate, taxes and insurance</span>
+      <span class="home-go">Start buyer sheet
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </span>
+    </button>
+    <button type="button" class="home-card seller" data-mode="seller">
+      <span class="home-card-top">
+        <span class="home-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 5h13v8H5"/><path d="M9 9h5"/></svg>
+        </span>
+        <span class="home-tag">For sellers</span>
+      </span>
+      <span class="home-title">Seller Net Sheet</span>
+      <span class="home-text">Commission, transfer tax, closing costs and the estimated return to the seller.</span>
+      <span class="home-need"><b>You'll need</b>Price, commission from the listing contract, payoff if known</span>
+      <span class="home-go">Start seller sheet
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </span>
+    </button>
+  </div>
+  <p class="home-foot">Client names and numbers are never saved or sent anywhere. The property address is checked with the U.S. Census Bureau to find the municipality. Title, tax and lender lines are calculated for you and can't be edited.</p>
+</section>
+
+<main class="layout" id="workspace" hidden>
+  <div class="inputs-col">
+    <div class="form-head">
+      <span class="flowtag" id="flowTag"></span>
+      <h1 id="formTitle"></h1>
+      <p id="formSub"></p>
+      <p class="legend"><span class="req" aria-hidden="true">*</span> Required</p>
+    </div>
+    <form class="inputs" id="form" autocomplete="off" novalidate></form>
+  </div>
+
+  <section class="preview" id="preview" aria-label="Result and sheet preview">
+    <div class="hero" id="hero"></div>
+    <div class="status" id="status" tabindex="-1"></div>
+    <div class="paperbox" id="paperbox">
+      <div class="paperhead">
+        <button type="button" class="back" id="pBack">Back</button>
+        <button type="button" class="back" id="pView" aria-pressed="false">Show full page</button>
+        <span>Sheet preview · updates as you type</span>
+        <span id="pageNote">Letter · 1 page</span>
+      </div>
+      <div class="paperwrap" id="paperFit">
+        <span class="flag" id="paperFlag">Preview only. Finish the required items to print.</span>
+        <article class="paper" id="sheet"></article>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="pbottom" id="pbottom" hidden>
+  <button type="button" class="pb sec" id="pPreview">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+    Preview
+  </button>
+  <button type="button" class="pb pri" id="pPrint"></button>
+</div>
+
+<div class="sr-only" id="liveNum" aria-live="polite"></div>
+
+<dialog id="newDealDialog" aria-labelledby="ndText">
+  <p id="ndText">Clear everything and start a new deal? Your name and office stay.</p>
+  <div class="dialog-actions">
+    <button type="button" class="btn outline" id="ndCancel">Cancel</button>
+    <button type="button" class="btn solid" id="ndOk">Clear and start over</button>
+  </div>
+</dialog>
+<script src="rates.js"></script>
+<script src="engine.js"></script>
+<script src="local-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

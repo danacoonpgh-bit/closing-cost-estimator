@@ -1,0 +1,43 @@
+/* Closing Cost Estimator: Direction A tokens. Generated from tokens.json. */
+:root{
+  --navy: #012169;
+  --buyer: #012169;
+  --buyer-tint: #eaf0fb;
+  --seller: #1f69ff;
+  --seller-tint: #f0f5fb;
+  --seller-text: #1550d0;
+  --ink: #0f1b2d;
+  --ink-2: #2a3547;
+  --muted: #556074;
+  --line: #dce2eb;
+  --field-border: #7b879a;
+  --page: #f4f6fa;
+  --surface: #ffffff;
+  --error: #b42318;
+  --error-bg: #fdf1ef;
+  --warning: #6f4500;
+  --warning-bg: #fff4d6;
+  --warning-line: #d39a2b;
+  --ok: #1b3c55;
+  --ok-bg: #dae1e8;
+  --focus: #0a1730;
+  --draft-bg: #fff0b8;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 14px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 28px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-pill: 999px;
+  --control-height: 50px;
+  --phone-button-height: 52px;
+  --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-sans: "Public Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+/* Flow accents: set data-mode on <body> as app.js already does */
+body[data-mode="buyer"]{--accent: var(--buyer); --accent-text: var(--buyer); --accent-tint: var(--buyer-tint);}
+body[data-mode="seller"]{--accent: var(--seller); --accent-text: var(--seller-text); --accent-tint: var(--seller-tint);}
