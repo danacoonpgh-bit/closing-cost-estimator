@@ -66,8 +66,10 @@
 
     // ----- Loan -----
     var loanConv = type === "C" ? num(input.loanAmount) : 0;
+    // An exempt VA buyer owes no funding fee, so nothing is financed on top of the price.
+    var vaFee = type === "V" && !input.vaFundingFeeExempt ? rates.va.fundingFee : 0;
     var loanGov = type === "F" ? price * rates.fha.loanToValue * (1 + rates.fha.upfrontPremium)
-                : type === "V" ? price * (1 + rates.va.fundingFee) : 0;
+                : type === "V" ? price * (1 + vaFee) : 0;
     var loan = loanConv + loanGov;
     var ltv = price > 0 ? loanConv / price : 0;
     var secondLoan = num(input.secondLoan);
@@ -132,7 +134,7 @@
       taxes: num(input.annualTaxes) / 12 * num(input.taxMonths),
       insuranceMonths: rates.insurancePrepaidMonths,
       insurance: isCash ? 0 : num(input.annualInsurance) / 12 * rates.insurancePrepaidMonths,
-      govPremium: type === "F" ? fhaBase * rates.fha.upfrontPremium : type === "V" ? price * rates.va.fundingFee : 0,
+      govPremium: type === "F" ? fhaBase * rates.fha.upfrontPremium : type === "V" ? price * vaFee : 0,
       pmiEscrowMonths: rates.pmiEscrowMonths,
       pmiEscrow: pmiMonthly * rates.pmiEscrowMonths,
       interestDays: interestDays,
