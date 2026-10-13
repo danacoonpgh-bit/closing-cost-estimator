@@ -44,9 +44,9 @@
   function muniOf(s) { return MUNIS[s.municipality] || null; }
   // The dropdown lists only the places above the usual total; everywhere else is one "all others" choice.
   var USUAL_TAX = L.stateTransferTax + 1;
-  var higherTaxOptions = L.municipalities.filter(function (m) { return MUNIS[m[0]].total > USUAL_TAX; }).map(function (m) {
+  var higherTaxOptions = [{ v: "all-others", label: "All other municipalities: " + USUAL_TAX + "%" }].concat(L.municipalities.filter(function (m) { return MUNIS[m[0]].total > USUAL_TAX; }).map(function (m) {
     return { v: m[0], label: m[0] + ": " + MUNIS[m[0]].total + "%" };
-  }).concat([{ v: "all-others", label: "All other municipalities: " + USUAL_TAX + "%" }, { v: "other", label: "A different rate (enter it)" }]);
+  })).concat([{ v: "other", label: "A different rate (enter it)" }]);
   var PLANS = {};
   L.warranty.plans.forEach(function (p) { PLANS[p.id] = p; });
   function warrantyAmount(planId, manual, addListing) {
