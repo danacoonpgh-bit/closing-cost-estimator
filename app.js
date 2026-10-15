@@ -44,9 +44,9 @@
   function muniOf(s) { return MUNIS[s.municipality] || null; }
   // The dropdown lists only the places above the usual total; everywhere else is one "all others" choice.
   var USUAL_TAX = L.stateTransferTax + 1;
-  var higherTaxOptions = [{ v: "all-others", label: "All other municipalities: " + USUAL_TAX + "%" }].concat(L.municipalities.filter(function (m) { return MUNIS[m[0]].total > USUAL_TAX; }).map(function (m) {
+  var higherTaxOptions = L.municipalities.filter(function (m) { return MUNIS[m[0]].total > USUAL_TAX; }).map(function (m) {
     return { v: m[0], label: m[0] + ": " + MUNIS[m[0]].total + "%" };
-  })).concat([{ v: "other", label: "A different rate (enter it)" }]);
+  }).concat([{ v: "all-others", label: "All other municipalities: " + USUAL_TAX + "%" }, { v: "other", label: "A different rate (enter it)" }]);
   var PLANS = {};
   L.warranty.plans.forEach(function (p) { PLANS[p.id] = p; });
   function warrantyAmount(planId, manual, addListing) {
@@ -62,21 +62,7 @@
   var marketDate = new Date(L.market.asOf + "T12:00:00");
   var marketRate = (Date.now() - marketDate.getTime()) / 864e5 <= 14 ? L.market.rate30 : null;
   var marketWeek = marketDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-  // Placeholder insurance tiers: a state average scaled by price. The agent can always type the real quote.
-  var INS = L.insurance;
   var dollars0 = function (x) { return "$" + Math.round(x).toLocaleString("en-US"); };
-  function insurancePremium(band) { return Math.round(band / INS.anchorCoverage * INS.anchorPremium / 25) * 25; }
-  function insuranceBand(price) {
-    return INS.bands.reduce(function (best, b) { return Math.abs(b - price) < Math.abs(best - price) ? b : best; }, INS.bands[0]);
-  }
-  // The tier closest to the sales price goes first; the rest follow in order; the real quote is last.
-  function insuranceOptions(price) {
-    var first = price > 0 ? insuranceBand(price) : null;
-    var tier = function (b) { return { v: String(b), label: dollars0(b) + " home: about " + dollars0(insurancePremium(b)) + " a year" }; };
-    var list = INS.bands.filter(function (b) { return b !== first; }).map(tier);
-    if (first) { var top = tier(first); top.label = "Closest to this price · " + top.label; list.unshift(top); }
-    return list.concat([{ v: "quote", label: "Enter the buyer's actual quote" }]);
-  }
   var FIELDS = {
     agentName: { label: "Agent name", kind: "text", req: true },
     office: { label: "Office", kind: "select", req: true, options: R.offices.map(function (o) { return opt(o.no, o.name); }) },
@@ -90,9 +76,6 @@
     loanType: { label: "How is the buyer paying?", kind: "choice", req: "buyer", full: true,
       options: [opt("C", "Conventional"), opt("F", "FHA"), opt("V", "VA"), opt("CASH", "Cash")] },
     loanAmount: { label: "Loan amount", kind: "money", req: "buyer", full: true, chips: [3, 5, 10, 15, 20], when: function (s) { return s.loanType === "C"; } },
-    vaExempt: { label: "Is the buyer exempt from the VA funding fee?", kind: "choice", full: true, def: "no",
-      options: [opt("no", "No, include the fee"), opt("yes", "Yes, exempt")], when: function (s) { return s.loanType === "V"; },
-      hint: "Optional. Leave on No unless the buyer's Certificate of Eligibility says exempt. The lender confirms it." },
     govNote: { kind: "note", when: function (s) { return s.loanType === "F" || s.loanType === "V"; } },
     rate: { label: "Interest rate", kind: "pct", req: "buyer", ph: "6.375", when: notCash, def: marketRate ? String(marketRate) : "",
       hint: marketRate ? "Starts at the " + L.market.source + " 30-year average for the week of " + marketWeek + ". Change it to the lender's quote." : "" },
@@ -100,11 +83,8 @@
     points: { label: "Points", kind: "num", def: "0", hint: "Enter 1 for one point.", when: notCash },
     annualTaxes: { label: "Annual real estate taxes", kind: "money", req: "buyer", hint: "All taxes combined: county, municipal and school." },
     taxMonths: { label: "Months of tax escrow + proration", kind: "num", req: "buyer", def: "12", hint: "Usually 10 to 12." },
-    insurancePlan: { label: "Annual homeowners insurance", kind: "select", req: "buyer", full: true, when: notCash, options: insuranceOptions(0),
-      hint: "Placeholder figures, not a quote: the Pennsylvania average (" + dollars0(INS.anchorPremium) + " a year for " + dollars0(INS.anchorCoverage) +
-        " of coverage; " + INS.source + ") scaled by sales price." },
-    annualInsurance: { label: "Annual homeowners insurance (buyer's quote)", kind: "money", req: "buyer", full: true,
-      when: function (s) { return notCash(s) && s.insurancePlan === "quote"; } },
+    annualInsurance: { label: "Annual homeowners insurance", kind: "money", req: "buyer", full: true, when: notCash,
+      hint: "From the buyer's insurance quote." },
     condoFee: { label: "Monthly condo / HOA fee", kind: "money", ph: "0" },
     municipality: { label: "Transfer tax: which municipality?", kind: "select", req: true, full: true, options: higherTaxOptions,
       hint: "Only " + L.transferTaxCounty + " County places above " + USUAL_TAX + "% are listed. Everywhere else, pick All other municipalities." },
@@ -121,7 +101,6 @@
       options: [opt("pct", "Percent of price"), opt("flat", "Flat dollar amount")] },
     commissionValue: { label: "Total commission (percent)", kind: "pct", req: "seller" },
     cbFeeSeller: { label: "Coldwell Banker additional commission", kind: "money", ph: "0", hint: "Per listing contract." },
-    addlSellerCommission: { label: "Additional seller commission (if any)", kind: "money", ph: "0", hint: "Per sales agreement." },
     buyerCommissionType: { label: "Buyer paid agent commission is a", kind: "choice", full: true, def: "pct",
       options: [opt("pct", "Percent of price"), opt("flat", "Flat dollar amount")] },
     buyerPaidCommission: { label: "Buyer paid agent commission (percent)", kind: "pct", hint: "Per buyer agency contract." },
@@ -159,9 +138,9 @@
         { title: "You", fields: ["agentName", "office"] },
         { title: "Property and buyer", fields: ["address", "cityStateZip", "county", "buyerName",
           { id: "sellerName", hint: "Optional on this sheet." }, "settlementDate"] },
-        { title: "Price and financing", fields: ["price", "loanType", "loanAmount", "vaExempt", "govNote", "rate", "termYears", "points"] },
+        { title: "Price and financing", fields: ["price", "loanType", "loanAmount", "govNote", "rate", "termYears", "points"] },
         { title: "Taxes and insurance", sub: "You enter the tax amounts. The sheet does the math and those lines can't be edited.",
-          fields: ["annualTaxes", "taxMonths", "insurancePlan", "annualInsurance", "condoFee", "municipality", "muniNote", "transferTaxOther", "calcNote"] },
+          fields: ["annualTaxes", "taxMonths", "annualInsurance", "condoFee", "municipality", "muniNote", "transferTaxOther", "calcNote"] },
         { title: "Deal terms", fields: ["handMoney", "assist", "relocation"] },
         { title: "Buyer agency commission", sub: "Enter what the signed buyer agency contract says. Nothing is pre-filled.",
           fields: ["buyerCommissionType", "buyerPaidCommission", "cbFeeBuyer"] },
@@ -179,11 +158,10 @@
         { title: "Sale", fields: ["price", "municipality", "muniNote", "transferTaxOther",
           { id: "assist", label: "Closing cost assistance paid to buyer" }] },
         { title: "Commission", sub: "Enter what the signed listing contract says. Nothing is pre-filled.",
-          fields: ["commissionType", "commissionValue", "cbFeeSeller", "addlSellerCommission"] },
+          fields: ["commissionType", "commissionValue", "cbFeeSeller"] },
         { title: "Payoff and other costs", fields: ["mortgagePayoff", "municipalLetters", "warrantyPlanSeller", "sellerListing", "warrantySeller"] },
-        { title: "Buyer's loan", sub: "Only matters for VA. Skip it if you don't know yet.", fields: [
-          { id: "loanType", label: "Buyer's loan type (if known)", unknown: true },
-          { id: "pest", label: "Pest inspection (seller pays on VA loans)", when: function (s) { return s.loanType === "V"; } }] }
+        { title: "Buyer's loan", sub: "Optional. Skip it if you don't know yet.", fields: [
+          { id: "loanType", label: "Buyer's loan type (if known)", unknown: true }] }
       ]
     }
   };
@@ -349,9 +327,8 @@
     return {
       countyGroup: county ? county.group : "",
       price: num(s, "price"), loanType: s.loanType, loanAmount: num(s, "loanAmount"),
-      vaFundingFeeExempt: mode === "buyer" && s.loanType === "V" && s.vaExempt === "yes",
       termYears: num(s, "termYears"), rate: num(s, "rate"), points: num(s, "points"),
-      annualTaxes: num(s, "annualTaxes"), taxMonths: num(s, "taxMonths"), annualInsurance: !notCash(s) ? null : s.insurancePlan === "quote" ? num(s, "annualInsurance") : Number(s.insurancePlan) ? insurancePremium(Number(s.insurancePlan)) : null,
+      annualTaxes: num(s, "annualTaxes"), taxMonths: num(s, "taxMonths"), annualInsurance: !notCash(s) ? null : num(s, "annualInsurance"),
       transferTaxPct: tt, assist: num(s, "assist"), condoFee: num(s, "condoFee"),
       homeInspection: num(s, "homeInspection"), radon: num(s, "radon"), pest: num(s, "pest"),
       wellSeptic: num(s, "wellSeptic"), survey: num(s, "survey"),
@@ -359,7 +336,7 @@
       warrantyBuyer: warrantyAmount(s.warrantyPlan, num(s, "warrantyBuyer"), false),
       secondLoan: num(s, "secondLoan"), secondTermYears: num(s, "secondTermYears"), secondRate: num(s, "secondRate"),
       cbFeeBuyer: num(s, "cbFeeBuyer"), buyerPaidCommission: buyerCommission,
-      cbFeeSeller: num(s, "cbFeeSeller"), addlSellerCommission: num(s, "addlSellerCommission"),
+      cbFeeSeller: num(s, "cbFeeSeller"),
       commissionType: s.commissionType, commissionValue: num(s, "commissionValue"),
       settlementDate: parseDate(s.settlementDate),
       handMoney: num(s, "handMoney"), relocation: num(s, "relocation"),
@@ -416,11 +393,6 @@
         warn("loanAmount", "Loan is above the " + usd0.format(lim.conformingLoan) + " conforming limit. Jumbo rates and fees differ. Confirm with the lender.");
       if (marketRate && s.loanType && s.loanType !== "CASH" && inp.rate === marketRate)
         warn("rate", "Interest rate is the " + L.market.source + " weekly average (" + marketRate + "%), not a lender quote. Confirm it before you print.");
-      if (s.loanType !== "CASH" && Number(s.insurancePlan))
-        warn("insurancePlan", "Homeowners insurance (" + money(inp.annualInsurance) + " a year) is a Pennsylvania average scaled to the price, not a quote. Confirm it before you print." +
-          (price > 0 && Number(s.insurancePlan) !== insuranceBand(price) ? " It's the tier for a " + dollars0(Number(s.insurancePlan)) + " home, and the price is " + dollars0(price) + "." : ""));
-      if (inp.vaFundingFeeExempt)
-        warn("vaExempt", "This sheet leaves out the VA funding fee" + (price > 0 ? " (" + money(price * R.va.fundingFee) + ")" : "") + " because the buyer is marked exempt. The lender confirms that from the Certificate of Eligibility.");
       if (s.loanType === "F" && price * R.fha.loanToValue > lim.fhaLoan)
         warn("price", "This is above the " + usd0.format(lim.fhaLoan) + " FHA loan limit. The buyer would need a larger down payment than this sheet assumes.");
     } else {
@@ -428,7 +400,7 @@
       if (commissionIsFlat() && inp.commissionValue !== null && price > 0 && inp.commissionValue > price * 0.15) add("commissionValue", "Commission can't be more than 15% of the price");
       if (inp.mortgagePayoff !== null && price > 0 && inp.mortgagePayoff > price * 2) add("mortgagePayoff", "Mortgage payoff looks too large. Check the number.");
       if (inp.mortgagePayoff === null) warn("mortgagePayoff", "No mortgage payoff entered. The sheet will say the return is before any payoff.");
-      if (s.loanType === "") warn("loanType", "Buyer's loan type isn't set. If the buyer uses a VA loan, the pest inspection moves to the seller.");
+      if (s.loanType === "") warn("loanType", "Buyer's loan type isn't set. Pest inspection is not charged on VA loans, so set the loan type before you print.");
       if (r.seller.net < 0) warn("", "The seller would owe money at settlement on these numbers.");
     }
     if (inp.settlementDate) {
@@ -488,7 +460,7 @@
       block("Estimated prepaid items", [
         row("Taxes", moneyOrDash(p.taxes), "", "(" + grouped(p.taxMonths) + " months)"),
         row("Insurance", moneyOrDash(p.insurance), "", "(" + p.insuranceMonths + " months)"),
-        row("FHA / VA First Use Premium", moneyOrDash(p.govPremium), "", inp.vaFundingFeeExempt ? "(VA funding fee exempt)" : ""),
+        row("FHA / VA First Use Premium", moneyOrDash(p.govPremium)),
         row("PMI Escrow", moneyOrDash(p.pmiEscrow), "", "(" + p.pmiEscrowMonths + " months)"),
         row("Interest", moneyOrDash(p.interest), "", "(" + p.interestDays + " days at " + money(p.perDiem) + " per day)"),
         row("Total Prepaid Items", money(p.total), "total")
@@ -694,19 +666,10 @@
         : "Transfer tax is " + USUAL_TAX + "% total: state " + L.stateTransferTax + "%, local " + (USUAL_TAX - L.stateTransferTax) + "%.") + " Buyer and seller each pay half.";
     }
     if (entries.address) $("h-address").textContent = addressNote;
-    if (entries.insurancePlan) {
-      var insSelect = $("insurancePlan"), insFirst = String(inp.price > 0 ? insuranceBand(inp.price) : "");
-      if (insSelect.getAttribute("data-first") !== insFirst) {
-        insSelect.setAttribute("data-first", insFirst);
-        fill(insSelect, [h("option", { value: "", text: "Choose…" })].concat(insuranceOptions(inp.price || 0).map(function (o) { return h("option", { value: o.v, text: o.label }); })));
-        insSelect.value = s.insurancePlan || "";
-      }
-    }
     if (entries.govNote && (s.loanType === "F" || s.loanType === "V")) {
       $("f-govNote").lastChild.textContent = (s.loanType === "F"
         ? "FHA: the sheet assumes 3.5% down and finances the 1.75% upfront premium."
-        : inp.vaFundingFeeExempt ? "VA: the sheet assumes no down payment. The buyer is marked exempt, so no funding fee is added."
-        : "VA: the sheet assumes no down payment and finances the " + grouped(R.va.fundingFee * 100) + "% first-use funding fee.")
+        : "VA: the sheet assumes no down payment and finances the 2.15% first-use funding fee.")
         + " The loan amount is set for you" + (r.loan ? ": " + money(r.loan) + "." : ".");
     }
     if (entries.loanAmount) {

@@ -66,10 +66,8 @@
 
     // ----- Loan -----
     var loanConv = type === "C" ? num(input.loanAmount) : 0;
-    // An exempt VA buyer owes no funding fee, so nothing is financed on top of the price.
-    var vaFee = type === "V" && !input.vaFundingFeeExempt ? rates.va.fundingFee : 0;
     var loanGov = type === "F" ? price * rates.fha.loanToValue * (1 + rates.fha.upfrontPremium)
-                : type === "V" ? price * (1 + vaFee) : 0;
+                : type === "V" ? price * (1 + rates.va.fundingFee) : 0;
     var loan = loanConv + loanGov;
     var ltv = price > 0 ? loanConv / price : 0;
     var secondLoan = num(input.secondLoan);
@@ -134,7 +132,7 @@
       taxes: num(input.annualTaxes) / 12 * num(input.taxMonths),
       insuranceMonths: rates.insurancePrepaidMonths,
       insurance: isCash ? 0 : num(input.annualInsurance) / 12 * rates.insurancePrepaidMonths,
-      govPremium: type === "F" ? fhaBase * rates.fha.upfrontPremium : type === "V" ? price * vaFee : 0,
+      govPremium: type === "F" ? fhaBase * rates.fha.upfrontPremium : type === "V" ? price * rates.va.fundingFee : 0,
       pmiEscrowMonths: rates.pmiEscrowMonths,
       pmiEscrow: pmiMonthly * rates.pmiEscrowMonths,
       interestDays: interestDays,
@@ -160,10 +158,8 @@
 
     // ----- Seller -----
     var commission = input.commissionType === "flat" ? num(input.commissionValue) : num(input.commissionValue) / 100 * price;
-    // Correction: the spreadsheet's seller pest line pointed at an empty cell and was always $0.
-    // The buyer sheet removes the pest charge on VA loans, so on VA it now lands on the seller.
-    var sellerPest = !legacy && type === "V" ? num(input.pest) : 0;
     var hasPayoff = !legacy && input.mortgagePayoff !== null && input.mortgagePayoff !== undefined && input.mortgagePayoff !== "";
+    // The app has one additional-commission spot (Coldwell Banker). The spreadsheet's second line is kept only in legacy mode.
     var expenses = [
       ["Seller's Share of Transfer Tax", transferTotal - transferBuyer],
       ["Settlement Fee", s.settlementFee],
@@ -176,12 +172,10 @@
       ["Dye Test and Certification (if needed)", s.dyeTest],
       ["Resale Certificate (if needed)", s.resaleCertificate],
       ["Municipal Letters / Tax Certifications", legacy ? 0 : num(input.municipalLetters)],
-      ["Pest Inspection (VA loans only)", sellerPest],
       ["Home Warranty", num(input.warrantySeller)],
       ["Coldwell Banker Additional Commission - Seller", num(input.cbFeeSeller)],
-      ["Additional Seller Commission (if any)", num(input.addlSellerCommission)],
       ["Overnight per Payoff", s.overnightPayoff]
-    ];
+    ].concat(legacy ? [["Additional Seller Commission (if any)", num(input.addlSellerCommission)]] : []);
     var expenseTotal = expenses.reduce(function (a, r) { return a + (r[1] || 0); }, 0);
     var balance = price - expenseTotal;
     var payoff = hasPayoff ? num(input.mortgagePayoff) : 0;
