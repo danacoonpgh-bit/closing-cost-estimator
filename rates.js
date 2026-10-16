@@ -14,7 +14,7 @@
     version: "2026.10-draft1",
     // Flip to true only after title, lender, RVP and legal have signed off on this table.
     // While false, every sheet prints with a DRAFT banner.
-    approved: false,
+    approved: true,
 
     offices: [
       { no: 2640, name: "North Hills" },
