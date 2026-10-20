@@ -118,7 +118,7 @@
     pest: { label: "Pest inspection", kind: "money", ph: "0" },
     sewerScopeBuyer: { label: "Sewer line camera inspection", kind: "money", ph: "0" },
     sewerScopeSeller: { label: "Sewer line camera inspection", kind: "money", ph: "0" },
-    testOccupancy: { label: "Test and occupancy inspection", kind: "money", ph: "0" },
+    testOccupancy: { label: "Dye test and occupancy inspection", kind: "money", ph: "0" },
     wellSeptic: { label: "Well and/or septic", kind: "money", ph: "0" },
     survey: { label: "Survey", kind: "money", ph: "0" },
     warrantyPlan: { label: "Home warranty", kind: "select", full: true, options: warrantyOptions, hint: warrantyHint },
