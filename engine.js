@@ -66,7 +66,9 @@
 
     // ----- Loan -----
     var loanConv = type === "C" ? num(input.loanAmount) : 0;
-    var loanGov = type === "F" ? price * rates.fha.loanToValue * (1 + rates.fha.upfrontPremium)
+    // FHA loan-to-value comes from the sheet's down payment; the fee table's 3.5% is the default.
+    var fhaLtv = input.fhaLoanToValue !== null && input.fhaLoanToValue !== undefined ? input.fhaLoanToValue : rates.fha.loanToValue;
+    var loanGov = type === "F" ? price * fhaLtv * (1 + rates.fha.upfrontPremium)
                 : type === "V" ? price * (1 + rates.va.fundingFee) : 0;
     var loan = loanConv + loanGov;
     var ltv = price > 0 ? loanConv / price : 0;
@@ -90,6 +92,7 @@
       ["Home Inspection (optional)", num(input.homeInspection)],
       ["Radon (optional)", num(input.radon)],
       ["Pest Inspection (optional)", type === "V" ? 0 : num(input.pest)],
+      ["Sewer Line Camera Inspection (optional)", num(input.sewerScopeBuyer)],
       ["Transfer Tax", transferBuyer],
       ["Well and Septic", num(input.wellSeptic)],
       ["Survey (optional)", num(input.survey)],
@@ -126,7 +129,7 @@
     var perDiem = num(input.rate) / 100 * loan / 12 / 30;
     // Correction: the spreadsheet used 31 minus the day for every month.
     var interestDays = !d ? 0 : legacy ? 31 - d.day : daysInMonth(d.year, d.month) - d.day + 1;
-    var fhaBase = Math.floor(price * rates.fha.loanToValue / rates.fha.baseRoundTo) * rates.fha.baseRoundTo;
+    var fhaBase = Math.floor(price * fhaLtv / rates.fha.baseRoundTo) * rates.fha.baseRoundTo;
     var prepaid = {
       taxMonths: num(input.taxMonths),
       taxes: num(input.annualTaxes) / 12 * num(input.taxMonths),
@@ -170,6 +173,8 @@
       ["Proration of Current Year Property Taxes", null],
       ["Proration of Current Water / Sewer Bills", null],
       ["Dye Test and Certification (if needed)", s.dyeTest],
+      ["Sewer Line Camera Inspection (if needed)", num(input.sewerScopeSeller)],
+      ["Test and Occupancy Inspection (if needed)", num(input.testOccupancy)],
       ["Resale Certificate (if needed)", s.resaleCertificate],
       ["Municipal Letters / Tax Certifications", legacy ? 0 : num(input.municipalLetters)],
       ["Home Warranty", num(input.warrantySeller)],
