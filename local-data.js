@@ -14,6 +14,18 @@
     // This number goes stale every week. The form stops pre-filling it once it is over 14 days old.
     market: { rate30: 7.40, asOf: "2026-10-08", source: "Freddie Mac" },
 
+    // Offices shown in the "Office" dropdown and printed on the sheet.
+    offices: [
+      { no: 2640, name: "North Hills" },
+      { no: 2643, name: "Airport" },
+      { no: 2648, name: "Fox Chapel" },
+      { no: 2665, name: "Cranberry" },
+      { no: 2669, name: "North Huntingdon" },
+      { no: 2673, name: "East Regional" },
+      { no: 2677, name: "City Center" },
+      { no: 2671, name: "South Regional" }
+    ],
+
     // PLACEHOLDER homeowners insurance tiers, until the office's insurance agency supplies a real table.
     // Anchor: NerdWallet, "The Best Home Insurance in Pennsylvania" (updated 2026-03-13, rates from
     // Quadrant Information Services): Pennsylvania average of $2,045 a year for a sample policy with

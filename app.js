@@ -44,9 +44,12 @@
   function muniOf(s) { return MUNIS[s.municipality] || null; }
   // The dropdown lists only the places above the usual total; everywhere else is one "all others" choice.
   var USUAL_TAX = L.stateTransferTax + 1;
-  var higherTaxOptions = L.municipalities.filter(function (m) { return MUNIS[m[0]].total > USUAL_TAX; }).map(function (m) {
+  var higherTaxOptions = [{ v: "all-others", label: "All other municipalities: " + USUAL_TAX + "%" }].concat(L.municipalities.filter(function (m) { return MUNIS[m[0]].total > USUAL_TAX; }).map(function (m) {
     return { v: m[0], label: m[0] + ": " + MUNIS[m[0]].total + "%" };
-  }).concat([{ v: "all-others", label: "All other municipalities: " + USUAL_TAX + "%" }, { v: "other", label: "A different rate (enter it)" }]);
+  })).concat([{ v: "other", label: "A different rate (enter it)" }]);
+  // Who pays the transfer tax. The engine reads buyerShare from the rates, so calc passes a copy with this share.
+  var TAX_SPLIT = { split: 0.5, buyer: 1, seller: 0 };
+  var SPLIT_TEXT = { split: "Buyer and seller each pay half.", buyer: "Buyer pays all of it.", seller: "Seller pays all of it." };
   var PLANS = {};
   L.warranty.plans.forEach(function (p) { PLANS[p.id] = p; });
   function warrantyAmount(planId, manual, addListing) {
@@ -65,7 +68,7 @@
   var dollars0 = function (x) { return "$" + Math.round(x).toLocaleString("en-US"); };
   var FIELDS = {
     agentName: { label: "Agent name", kind: "text", req: true },
-    office: { label: "Office", kind: "select", req: true, options: R.offices.map(function (o) { return opt(o.no, o.name); }) },
+    office: { label: "Office", kind: "select", req: true, options: L.offices.map(function (o) { return opt(o.no, o.name); }) },
     address: { label: "Property address", kind: "text", req: true, full: true },
     cityStateZip: { label: "City, state and zip", kind: "text", req: true },
     county: { label: "County", kind: "select", req: "buyer", options: R.counties.map(function (c) { return opt(c.name, c.name); }) },
@@ -93,6 +96,8 @@
       options: R.transferTax.choices.map(function (c) { return opt(c.pct, c.label); }).concat([opt("other", "Other")]),
       hint: "Buyer and seller each pay half." },
     transferTaxOther: { label: "Total transfer tax rate", kind: "pct", req: true, when: function (s) { return s.municipality === "other"; } },
+    transferTaxSplit: { label: "Who pays the transfer tax?", kind: "choice", req: true, full: true, def: "split",
+      options: [opt("split", "Buyer and seller split it evenly"), opt("buyer", "Buyer pays all of it"), opt("seller", "Seller pays all of it")] },
     calcNote: { kind: "calc" },
     handMoney: { label: "Hand money", kind: "money", ph: "0" },
     assist: { label: "Seller closing cost assistance", kind: "money", ph: "0" },
@@ -119,6 +124,9 @@
     warrantySeller: { label: "Home warranty fee", kind: "money", ph: "0", when: function (s) { return s.warrantyPlanSeller === "other"; } },
     mortgagePayoff: { label: "Estimated mortgage / lien payoff", kind: "money", full: true, hint: "Leave blank if unknown. The sheet will say payoff is not included." },
     municipalLetters: { label: "Municipal letters / tax certifications", kind: "money", ph: "0" },
+    repairEscrow: { label: "Repair escrow held after closing", kind: "money", ph: "0", full: true },
+    hoaResale: { label: "HOA resale certificate fee", kind: "money", ph: "0", full: true,
+      hint: "From the HOA. Leave blank if the home isn't in an HOA." },
     // Screen-only choice. It never reaches the engine; it only shows or hides the three second-loan fields.
     hasSecond: { label: "Is there a second mortgage?", kind: "choice", full: true, def: "no",
       options: [opt("no", "No"), opt("yes", "Yes")], hint: "Yes shows the second loan amount, rate and term." },
@@ -141,6 +149,7 @@
         { title: "Price and financing", fields: ["price", "loanType", "loanAmount", "govNote", "rate", "termYears", "points"] },
         { title: "Taxes and insurance", sub: "You enter the tax amounts. The sheet does the math and those lines can't be edited.",
           fields: ["annualTaxes", "taxMonths", "annualInsurance", "condoFee", "municipality", "muniNote", "transferTaxOther", "calcNote"] },
+        { title: "Transfer tax split", sub: "Choose who pays the transfer tax at settlement.", fields: ["transferTaxSplit"] },
         { title: "Deal terms", fields: ["handMoney", "assist", "relocation"] },
         { title: "Buyer agency commission", sub: "Enter what the signed buyer agency contract says. Nothing is pre-filled.",
           fields: ["buyerCommissionType", "buyerPaidCommission", "cbFeeBuyer"] },
@@ -157,9 +166,12 @@
         { title: "Property and seller", fields: ["address", "cityStateZip", "sellerName", "settlementDate"] },
         { title: "Sale", fields: ["price", "municipality", "muniNote", "transferTaxOther",
           { id: "assist", label: "Closing cost assistance paid to buyer" }] },
+        { title: "Transfer tax split", sub: "Choose who pays the transfer tax at settlement.", fields: ["transferTaxSplit"] },
         { title: "Commission", sub: "Enter what the signed listing contract says. Nothing is pre-filled.",
           fields: ["commissionType", "commissionValue", "cbFeeSeller"] },
         { title: "Payoff and other costs", fields: ["mortgagePayoff", "municipalLetters", "warrantyPlanSeller", "sellerListing", "warrantySeller"] },
+        { title: "Repair escrow", fields: ["repairEscrow"] },
+        { title: "HOA resale certificate", sub: "Enter the fee the HOA charges for the resale certificate. Nothing is pre-filled.", fields: ["hoaResale"] },
         { title: "Buyer's loan", sub: "Optional. Skip it if you don't know yet.", fields: [
           { id: "loanType", label: "Buyer's loan type (if known)", unknown: true }] }
       ]
@@ -418,7 +430,7 @@
   }
   function block(title, rows) { return h("div", { class: "block" }, [h("h3", { text: title })].concat(rows)); }
   function officeName(s) {
-    var o = R.offices.filter(function (x) { return String(x.no) === s.office; })[0];
+    var o = L.offices.filter(function (x) { return String(x.no) === s.office; })[0];
     return o ? "Coldwell Banker - " + o.name : "";
   }
   function sheetShell(title, s, metaRows, body, fine, signLabel) {
@@ -526,6 +538,7 @@
         row("Insurance Refund", "TBD at closing", "indent"),
         row("Tax Refund", "TBD at closing", "indent"),
         row("Other Credits", "TBD at closing", "indent"),
+        row("Held in repair escrow (released after repairs)", moneyOrDash(-x.repairEscrow), "indent"),
         row(sellerNetLabel(x), money(x.net), "grand")
       ])
     ]);
@@ -643,7 +656,12 @@
 
     var s = values;
     var inp = toEngineInput(s);
-    var r = E.calculate(inp, R);
+    var splitRates = Object.assign({}, R, { transferTax: Object.assign({}, R.transferTax, { buyerShare: TAX_SPLIT[s.transferTaxSplit] !== undefined ? TAX_SPLIT[s.transferTaxSplit] : R.transferTax.buyerShare }),
+      seller: Object.assign({}, R.seller, { resaleCertificate: num(s, "hoaResale") || 0 }) });
+    var r = E.calculate(inp, splitRates);
+    // Repair escrow is held from the seller's proceeds after closing. It is not a cost, so it comes off the return only.
+    r.seller.repairEscrow = num(s, "repairEscrow") || 0;
+    r.seller.net -= r.seller.repairEscrow;
     var v = validate(s, inp, r);
     var ready = v.errors.length === 0;
     // Same errors list, sorted: a blank field is "still needed", anything else is "fix this".
@@ -663,7 +681,7 @@
     if (entries.muniNote && (muni || s.municipality === "all-others")) {
       $("f-muniNote").lastChild.textContent = (muni
         ? "Transfer tax here is " + muni.total + "% total: state " + L.stateTransferTax + "%, " + muni.name + " " + muni.muni + "%, " + muni.school + " schools " + muni.sd + "%."
-        : "Transfer tax is " + USUAL_TAX + "% total: state " + L.stateTransferTax + "%, local " + (USUAL_TAX - L.stateTransferTax) + "%.") + " Buyer and seller each pay half.";
+        : "Transfer tax is " + USUAL_TAX + "% total: state " + L.stateTransferTax + "%, local " + (USUAL_TAX - L.stateTransferTax) + "%.") + " " + (SPLIT_TEXT[s.transferTaxSplit] || SPLIT_TEXT.split);
     }
     if (entries.address) $("h-address").textContent = addressNote;
     if (entries.govNote && (s.loanType === "F" || s.loanType === "V")) {
