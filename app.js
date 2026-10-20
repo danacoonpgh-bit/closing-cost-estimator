@@ -175,7 +175,7 @@
         { title: "Transfer tax split", sub: "Choose who pays the transfer tax at settlement.", fields: ["transferTaxSplit"] },
         { title: "Commission", sub: "Enter what the signed listing contract says. Nothing is pre-filled.",
           fields: ["commissionType", "commissionValue", "cbFeeSeller"] },
-        { title: "Inspections", sub: "Enter what the inspector charges if the seller pays. Leave blank if it doesn't apply. Nothing is pre-filled.",
+        { title: "Township Requirements", sub: "Enter what the inspector charges if the seller pays. Leave blank if it doesn't apply. Nothing is pre-filled.",
           fields: ["sewerScopeSeller", "testOccupancy"] },
         { title: "Payoff and other costs", fields: ["mortgagePayoff", "municipalLetters", "warrantyPlanSeller", "sellerListing", "warrantySeller"] },
         { title: "Repair escrow", fields: ["repairEscrow"] },
