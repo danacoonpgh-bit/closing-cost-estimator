@@ -80,6 +80,9 @@
       options: [opt("C", "Conventional"), opt("F", "FHA"), opt("V", "VA"), opt("CASH", "Cash")] },
     loanAmount: { label: "Loan amount", kind: "money", req: "buyer", full: true, chips: [3, 5, 10, 15, 20], when: function (s) { return s.loanType === "C"; } },
     govNote: { kind: "note", when: function (s) { return s.loanType === "F" || s.loanType === "V"; } },
+    fhaDown: { label: "Down payment (percent)", kind: "pct", req: "buyer", def: "3.5", full: true,
+      when: function (s) { return s.loanType === "F"; },
+      hint: "Starts at 3.5%, the FHA minimum. Change it if the buyer is putting down more." },
     rate: { label: "Interest rate", kind: "pct", req: "buyer", ph: "6.375", when: notCash, def: marketRate ? String(marketRate) : "",
       hint: marketRate ? "Starts at the " + L.market.source + " 30-year average for the week of " + marketWeek + ". Change it to the lender's quote." : "" },
     termYears: { label: "Loan term (years)", kind: "num", req: "buyer", def: "30", when: notCash },
@@ -113,6 +116,9 @@
     homeInspection: { label: "Home inspection", kind: "money", ph: "0" },
     radon: { label: "Radon", kind: "money", ph: "0" },
     pest: { label: "Pest inspection", kind: "money", ph: "0" },
+    sewerScopeBuyer: { label: "Sewer line camera inspection", kind: "money", ph: "0" },
+    sewerScopeSeller: { label: "Sewer line camera inspection", kind: "money", ph: "0" },
+    testOccupancy: { label: "Test and occupancy inspection", kind: "money", ph: "0" },
     wellSeptic: { label: "Well and/or septic", kind: "money", ph: "0" },
     survey: { label: "Survey", kind: "money", ph: "0" },
     warrantyPlan: { label: "Home warranty", kind: "select", full: true, options: warrantyOptions, hint: warrantyHint },
@@ -146,7 +152,7 @@
         { title: "You", fields: ["agentName", "office"] },
         { title: "Property and buyer", fields: ["address", "cityStateZip", "county", "buyerName",
           { id: "sellerName", hint: "Optional on this sheet." }, "settlementDate"] },
-        { title: "Price and financing", fields: ["price", "loanType", "loanAmount", "govNote", "rate", "termYears", "points"] },
+        { title: "Price and financing", fields: ["price", "loanType", "loanAmount", "govNote", "fhaDown", "rate", "termYears", "points"] },
         { title: "Taxes and insurance", sub: "You enter the tax amounts. The sheet does the math and those lines can't be edited.",
           fields: ["annualTaxes", "taxMonths", "annualInsurance", "condoFee", "municipality", "muniNote", "transferTaxOther", "calcNote"] },
         { title: "Transfer tax split", sub: "Choose who pays the transfer tax at settlement.", fields: ["transferTaxSplit"] },
@@ -154,7 +160,7 @@
         { title: "Buyer agency commission", sub: "Enter what the signed buyer agency contract says. Nothing is pre-filled.",
           fields: ["buyerCommissionType", "buyerPaidCommission", "cbFeeBuyer"] },
         { title: "Inspections and warranty", sub: "Leave blank if it doesn't apply. Reach out to your inspector to find out what their costs are.",
-          fields: ["homeInspection", "radon", { id: "pest", hint: "Not charged to the buyer on VA loans." }, "wellSeptic", "survey", "warrantyPlan", "warrantyBuyer"] },
+          fields: ["homeInspection", "radon", { id: "pest", hint: "Not charged to the buyer on VA loans." }, "sewerScopeBuyer", "wellSeptic", "survey", "warrantyPlan", "warrantyBuyer"] },
         { title: "Second mortgage", fields: ["hasSecond", "secondLoan", "secondRate", "secondTermYears"] }
       ]
     },
@@ -169,6 +175,8 @@
         { title: "Transfer tax split", sub: "Choose who pays the transfer tax at settlement.", fields: ["transferTaxSplit"] },
         { title: "Commission", sub: "Enter what the signed listing contract says. Nothing is pre-filled.",
           fields: ["commissionType", "commissionValue", "cbFeeSeller"] },
+        { title: "Inspections", sub: "Enter what the inspector charges if the seller pays. Leave blank if it doesn't apply. Nothing is pre-filled.",
+          fields: ["sewerScopeSeller", "testOccupancy"] },
         { title: "Payoff and other costs", fields: ["mortgagePayoff", "municipalLetters", "warrantyPlanSeller", "sellerListing", "warrantySeller"] },
         { title: "Repair escrow", fields: ["repairEscrow"] },
         { title: "HOA resale certificate", sub: "Enter the fee the HOA charges for the resale certificate. Nothing is pre-filled.", fields: ["hoaResale"] },
@@ -340,9 +348,11 @@
       countyGroup: county ? county.group : "",
       price: num(s, "price"), loanType: s.loanType, loanAmount: num(s, "loanAmount"),
       termYears: num(s, "termYears"), rate: num(s, "rate"), points: num(s, "points"),
+      fhaLoanToValue: s.loanType === "F" && num(s, "fhaDown") !== null ? 1 - num(s, "fhaDown") / 100 : null,
       annualTaxes: num(s, "annualTaxes"), taxMonths: num(s, "taxMonths"), annualInsurance: !notCash(s) ? null : num(s, "annualInsurance"),
       transferTaxPct: tt, assist: num(s, "assist"), condoFee: num(s, "condoFee"),
       homeInspection: num(s, "homeInspection"), radon: num(s, "radon"), pest: num(s, "pest"),
+      sewerScopeBuyer: num(s, "sewerScopeBuyer"), sewerScopeSeller: num(s, "sewerScopeSeller"), testOccupancy: num(s, "testOccupancy"),
       wellSeptic: num(s, "wellSeptic"), survey: num(s, "survey"),
       warrantySeller: warrantyAmount(s.warrantyPlanSeller, num(s, "warrantySeller"), s.sellerListing === "yes"),
       warrantyBuyer: warrantyAmount(s.warrantyPlan, num(s, "warrantyBuyer"), false),
@@ -380,6 +390,11 @@
         if (inp.loanAmount <= 0) add("loanAmount", "Loan amount must be more than $0. Choose Cash if there is no loan.");
         else if (price > 0 && inp.loanAmount > price) add("loanAmount", "Loan amount can't be more than the sales price");
       }
+      if (s.loanType === "F" && inp.fhaLoanToValue !== null) {
+        var fhaDownPct = parseNum(s.fhaDown);
+        if (fhaDownPct < 3.5) add("fhaDown", "FHA requires at least 3.5% down. Buyers with credit under 580 need 10%, so confirm with the lender.");
+        else if (fhaDownPct >= 100) add("fhaDown", "Down payment must be less than 100%");
+      }
       if (s.loanType && s.loanType !== "CASH") {
         if (inp.rate !== null && (inp.rate <= 0 || inp.rate > 20)) add("rate", "Interest rate should be between 0 and 20. Enter 6.5 for 6.5%.");
         if (inp.termYears !== null && (inp.termYears < 1 || inp.termYears > 40)) add("termYears", "Loan term should be 1 to 40 years");
@@ -405,7 +420,7 @@
         warn("loanAmount", "Loan is above the " + usd0.format(lim.conformingLoan) + " conforming limit. Jumbo rates and fees differ. Confirm with the lender.");
       if (marketRate && s.loanType && s.loanType !== "CASH" && inp.rate === marketRate)
         warn("rate", "Interest rate is the " + L.market.source + " weekly average (" + marketRate + "%), not a lender quote. Confirm it before you print.");
-      if (s.loanType === "F" && price * R.fha.loanToValue > lim.fhaLoan)
+      if (s.loanType === "F" && price * (inp.fhaLoanToValue !== null ? inp.fhaLoanToValue : R.fha.loanToValue) > lim.fhaLoan)
         warn("price", "This is above the " + usd0.format(lim.fhaLoan) + " FHA loan limit. The buyer would need a larger down payment than this sheet assumes.");
     } else {
       if (!commissionIsFlat() && inp.commissionValue !== null && inp.commissionValue > 15) add("commissionValue", "Commission percent should be 15 or less. Switch to a flat dollar amount if you meant dollars.");
@@ -685,8 +700,9 @@
     }
     if (entries.address) $("h-address").textContent = addressNote;
     if (entries.govNote && (s.loanType === "F" || s.loanType === "V")) {
+      var fhaDownDollars = inp.price > 0 && inp.fhaLoanToValue !== null ? inp.price * (1 - inp.fhaLoanToValue) : null;
       $("f-govNote").lastChild.textContent = (s.loanType === "F"
-        ? "FHA: the sheet assumes 3.5% down and finances the 1.75% upfront premium."
+        ? "FHA: the sheet finances the 1.75% upfront premium." + (fhaDownDollars !== null ? " Down payment: " + money(fhaDownDollars) + "." : "")
         : "VA: the sheet assumes no down payment and finances the 2.15% first-use funding fee.")
         + " The loan amount is set for you" + (r.loan ? ": " + money(r.loan) + "." : ".");
     }
