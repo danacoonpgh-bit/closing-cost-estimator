@@ -107,8 +107,11 @@
     relocation: { label: "Company relocation contribution", kind: "money", ph: "0" },
     commissionType: { label: "Listing commission is a", kind: "choice", req: "seller", full: true, def: "pct",
       options: [opt("pct", "Percent of price"), opt("flat", "Flat dollar amount")] },
-    commissionValue: { label: "Total commission (percent)", kind: "pct", req: "seller" },
+    commissionValue: { label: "Listing commission percentage", kind: "pct", req: "seller", hint: "Per listing contract." },
     cbFeeSeller: { label: "Coldwell Banker additional commission", kind: "money", ph: "0", hint: "Per listing contract." },
+    sellerBuyerAgencyType: { label: "Buyer agent commission is a", kind: "choice", full: true, def: "pct",
+      options: [opt("pct", "Percent of price"), opt("flat", "Flat dollar amount")] },
+    sellerBuyerAgencyValue: { label: "Buyer agent commission paid by seller", kind: "pct", hint: "Leave blank if the seller doesn't pay the buyer agent." },
     buyerCommissionType: { label: "Buyer paid agent commission is a", kind: "choice", full: true, def: "pct",
       options: [opt("pct", "Percent of price"), opt("flat", "Flat dollar amount")] },
     buyerPaidCommission: { label: "Buyer paid agent commission (percent)", kind: "pct", hint: "Per buyer agency contract." },
@@ -174,7 +177,7 @@
           { id: "assist", label: "Closing cost assistance paid to buyer" }] },
         { title: "Transfer tax split", sub: "Choose who pays the transfer tax at settlement.", fields: ["transferTaxSplit"] },
         { title: "Commission", sub: "Enter what the signed listing contract says. Nothing is pre-filled.",
-          fields: ["commissionType", "commissionValue", "cbFeeSeller"] },
+          fields: ["commissionType", "commissionValue", "cbFeeSeller", "sellerBuyerAgencyType", "sellerBuyerAgencyValue"] },
         { title: "Township Requirements",
           fields: ["sewerScopeSeller", "testOccupancy"] },
         { title: "Payoff and other costs", fields: ["mortgagePayoff", "municipalLetters", "warrantyPlanSeller", "sellerListing", "warrantySeller"] },
@@ -239,11 +242,13 @@
   function longDate(d) {
     return new Date(d.year, d.month - 1, d.day).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   }
-  function commissionIsFlat() { return values.commissionType === "flat"; }
   function buyerCommissionIsFlat() { return values.buyerCommissionType === "flat"; }
+  function commissionIsFlat() { return values.commissionType === "flat"; }
+  function sellerBuyerIsFlat() { return values.sellerBuyerAgencyType === "flat"; }
   function labelOf(id) {
     if (id === "buyerPaidCommission") return buyerCommissionIsFlat() ? "Buyer paid agent commission (dollars)" : "Buyer paid agent commission (percent)";
-    if (id === "commissionValue") return commissionIsFlat() ? "Total commission (dollars)" : "Total commission (percent)";
+    if (id === "commissionValue" && commissionIsFlat()) return "Listing commission (dollars)";
+    if (id === "sellerBuyerAgencyValue") return sellerBuyerIsFlat() ? "Buyer agent commission paid by seller (dollars)" : "Buyer agent commission paid by seller (percent)";
     return (entries[id] && entries[id].label) || FIELDS[id].label;
   }
   function isNumber(f) { return f.kind === "money" || f.kind === "pct" || f.kind === "num"; }
@@ -344,6 +349,8 @@
     // A percent commission becomes dollars here, so the engine still gets a dollar amount.
     var buyerCommission = num(s, "buyerPaidCommission");
     if (buyerCommission !== null && s.buyerCommissionType !== "flat") buyerCommission = Math.round((num(s, "price") || 0) * buyerCommission) / 100;
+    var sellerBuyerCommission = num(s, "sellerBuyerAgencyValue");
+    if (sellerBuyerCommission !== null && s.sellerBuyerAgencyType !== "flat") sellerBuyerCommission = Math.round((num(s, "price") || 0) * sellerBuyerCommission) / 100;
     return {
       countyGroup: county ? county.group : "",
       price: num(s, "price"), loanType: s.loanType, loanAmount: num(s, "loanAmount"),
@@ -360,6 +367,7 @@
       cbFeeBuyer: num(s, "cbFeeBuyer"), buyerPaidCommission: buyerCommission,
       cbFeeSeller: num(s, "cbFeeSeller"),
       commissionType: s.commissionType, commissionValue: num(s, "commissionValue"),
+      sellerBuyerAgencyCommission: sellerBuyerCommission,
       settlementDate: parseDate(s.settlementDate),
       handMoney: num(s, "handMoney"), relocation: num(s, "relocation"),
       municipalLetters: num(s, "municipalLetters"), mortgagePayoff: num(s, "mortgagePayoff")
@@ -425,6 +433,8 @@
     } else {
       if (!commissionIsFlat() && inp.commissionValue !== null && inp.commissionValue > 15) add("commissionValue", "Commission percent should be 15 or less. Switch to a flat dollar amount if you meant dollars.");
       if (commissionIsFlat() && inp.commissionValue !== null && price > 0 && inp.commissionValue > price * 0.15) add("commissionValue", "Commission can't be more than 15% of the price");
+      if (!sellerBuyerIsFlat() && parseNum(s.sellerBuyerAgencyValue) > 15) add("sellerBuyerAgencyValue", "Commission percent should be 15 or less. Switch to a flat dollar amount if you meant dollars.");
+      if (sellerBuyerIsFlat() && price > 0 && inp.sellerBuyerAgencyCommission > price * 0.15) add("sellerBuyerAgencyValue", "Commission can't be more than 15% of the price");
       if (inp.mortgagePayoff !== null && price > 0 && inp.mortgagePayoff > price * 2) add("mortgagePayoff", "Mortgage payoff looks too large. Check the number.");
       if (inp.mortgagePayoff === null) warn("mortgagePayoff", "No mortgage payoff entered. The sheet will say the return is before any payoff.");
       if (s.loanType === "") warn("loanType", "Buyer's loan type isn't set. Pest inspection is not charged on VA loans, so set the loan type before you print.");
@@ -541,8 +551,11 @@
   function drawSeller(s, inp, r) {
     var x = r.seller;
     var commissionNote = !commissionIsFlat() && inp.commissionValue !== null ? "(" + inp.commissionValue + "%)" : "";
-    var rows = x.expenses.map(function (e, i) {
-      return row(e[0], e[1] === null ? "TBD at closing" : moneyOrDash(e[1]), "indent", i === 4 ? commissionNote : "");
+    var buyerAgencyPct = !sellerBuyerIsFlat() ? parseNum(s.sellerBuyerAgencyValue) : null;
+    var buyerAgencyNote = buyerAgencyPct !== null ? "(" + buyerAgencyPct + "%)" : "";
+    var rows = x.expenses.map(function (e) {
+      var note = e[0] === "Buyer Agent Commission Paid by Seller" ? buyerAgencyNote : e[0] === "Listing Commission" || e[0] === "Realtor Commission (per listing agreement)" ? commissionNote : "";
+      return row(e[0], e[1] === null ? "TBD at closing" : moneyOrDash(e[1]), "indent", note);
     });
     var body = h("div", {}, [
       block("Sale", [row("Sales Price", money(x.price))]),
@@ -686,7 +699,7 @@
 
     // Conditional fields and live hints
     Object.keys(entries).forEach(function (id) { $("f-" + id).hidden = !shown(id, s); });
-    [["commissionValue", commissionIsFlat], ["buyerPaidCommission", buyerCommissionIsFlat]].forEach(function (c) {
+    [["commissionValue", commissionIsFlat], ["buyerPaidCommission", buyerCommissionIsFlat], ["sellerBuyerAgencyValue", sellerBuyerIsFlat]].forEach(function (c) {
       if (!entries[c[0]]) return;
       var cv = $("f-" + c[0]);
       cv.querySelector(".control").className = "control " + (c[1]() ? "money" : "pct");
@@ -915,7 +928,7 @@
       var f = FIELDS[id];
       if (!f) return;
       touched[id] = true;
-      if (f.kind === "money" || (id === "commissionValue" && commissionIsFlat()) || (id === "buyerPaidCommission" && buyerCommissionIsFlat())) {
+      if (f.kind === "money" || (id === "commissionValue" && commissionIsFlat()) || (id === "buyerPaidCommission" && buyerCommissionIsFlat()) || (id === "sellerBuyerAgencyValue" && sellerBuyerIsFlat())) {
         var x = parseNum(e.target.value);
         e.target.value = x === null ? "" : grouped(x);
         values[id] = e.target.value;

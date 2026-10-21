@@ -162,13 +162,19 @@
     // ----- Seller -----
     var commission = input.commissionType === "flat" ? num(input.commissionValue) : num(input.commissionValue) / 100 * price;
     var hasPayoff = !legacy && input.mortgagePayoff !== null && input.mortgagePayoff !== undefined && input.mortgagePayoff !== "";
+    // The buyer agent line appears only when the seller pays one (a blank entry means none).
+    var buyerAgentPaid = input.sellerBuyerAgencyCommission !== null && input.sellerBuyerAgencyCommission !== undefined;
+    var commissionRows = (buyerAgentPaid
+      ? [["Listing Commission", commission], ["Buyer Agent Commission Paid by Seller", num(input.sellerBuyerAgencyCommission)]]
+      : [["Realtor Commission (per listing agreement)", commission]]
+    ).concat([["Coldwell Banker Additional Commission - Seller", num(input.cbFeeSeller)]]);
     // The app has one additional-commission spot (Coldwell Banker). The spreadsheet's second line is kept only in legacy mode.
     var expenses = [
       ["Seller's Share of Transfer Tax", transferTotal - transferBuyer],
       ["Settlement Fee", s.settlementFee],
       ["Processing Fee", s.processingFee],
-      ["New Deed & Notary Fee", s.deedAndNotary],
-      ["Realtor Commission (per listing agreement)", commission],
+      ["New Deed & Notary Fee", s.deedAndNotary]
+    ].concat(commissionRows, [
       ["Closing Cost Assistance", assist],
       ["Proration of Current Year Property Taxes", null],
       ["Proration of Current Water / Sewer Bills", null],
@@ -177,9 +183,8 @@
       ["Resale Certificate (if needed)", s.resaleCertificate],
       ["Municipal Letters / Tax Certifications", legacy ? 0 : num(input.municipalLetters)],
       ["Home Warranty", num(input.warrantySeller)],
-      ["Coldwell Banker Additional Commission - Seller", num(input.cbFeeSeller)],
       ["Overnight per Payoff", s.overnightPayoff]
-    ].concat(legacy ? [["Additional Seller Commission (if any)", num(input.addlSellerCommission)]] : []);
+    ]).concat(legacy ? [["Additional Seller Commission (if any)", num(input.addlSellerCommission)]] : []);
     var expenseTotal = expenses.reduce(function (a, r) { return a + (r[1] || 0); }, 0);
     var balance = price - expenseTotal;
     var payoff = hasPayoff ? num(input.mortgagePayoff) : 0;
