@@ -79,6 +79,9 @@
     loanType: { label: "How is the buyer paying?", kind: "choice", req: "buyer", full: true,
       options: [opt("C", "Conventional"), opt("F", "FHA"), opt("V", "VA"), opt("CASH", "Cash")] },
     loanAmount: { label: "Loan amount", kind: "money", req: "buyer", full: true, chips: [3, 5, 10, 15, 20], when: function (s) { return s.loanType === "C"; } },
+    vaExempt: { label: "Is the buyer exempt from the VA funding fee?", kind: "choice", full: true, def: "no",
+      options: [opt("no", "No, include the fee"), opt("yes", "Yes, exempt")], when: function (s) { return s.loanType === "V"; },
+      hint: "Optional. Leave on No unless the buyer's Certificate of Eligibility says exempt. The lender confirms it." },
     govNote: { kind: "note", when: function (s) { return s.loanType === "F" || s.loanType === "V"; } },
     fhaDown: { label: "Down payment (percent)", kind: "pct", req: "buyer", def: "3.5", full: true,
       when: function (s) { return s.loanType === "F"; },
@@ -155,7 +158,7 @@
         { title: "You", fields: ["agentName", "office"] },
         { title: "Property and buyer", fields: ["address", "cityStateZip", "county", "buyerName",
           { id: "sellerName", hint: "Optional on this sheet." }, "settlementDate"] },
-        { title: "Price and financing", fields: ["price", "loanType", "loanAmount", "govNote", "fhaDown", "rate", "termYears", "points"] },
+        { title: "Price and financing", fields: ["price", "loanType", "loanAmount", "vaExempt", "govNote", "fhaDown", "rate", "termYears", "points"] },
         { title: "Taxes and insurance", sub: "You enter the tax amounts. The sheet does the math and those lines can't be edited.",
           fields: ["annualTaxes", "taxMonths", "annualInsurance", "condoFee", "municipality", "muniNote", "transferTaxOther", "calcNote"] },
         { title: "Transfer tax split", sub: "Choose who pays the transfer tax at settlement.", fields: ["transferTaxSplit"] },
@@ -354,6 +357,7 @@
     return {
       countyGroup: county ? county.group : "",
       price: num(s, "price"), loanType: s.loanType, loanAmount: num(s, "loanAmount"),
+      vaFundingFeeExempt: mode === "buyer" && s.loanType === "V" && s.vaExempt === "yes",
       termYears: num(s, "termYears"), rate: num(s, "rate"), points: num(s, "points"),
       fhaLoanToValue: s.loanType === "F" && num(s, "fhaDown") !== null ? 1 - num(s, "fhaDown") / 100 : null,
       annualTaxes: num(s, "annualTaxes"), taxMonths: num(s, "taxMonths"), annualInsurance: !notCash(s) ? null : num(s, "annualInsurance"),
@@ -428,6 +432,8 @@
         warn("loanAmount", "Loan is above the " + usd0.format(lim.conformingLoan) + " conforming limit. Jumbo rates and fees differ. Confirm with the lender.");
       if (marketRate && s.loanType && s.loanType !== "CASH" && inp.rate === marketRate)
         warn("rate", "Interest rate is the " + L.market.source + " weekly average (" + marketRate + "%), not a lender quote. Confirm it before you print.");
+      if (inp.vaFundingFeeExempt)
+        warn("vaExempt", "This sheet leaves out the VA funding fee" + (price > 0 ? " (" + money(price * R.va.fundingFee) + ")" : "") + " because the buyer is marked exempt. The lender confirms that from the Certificate of Eligibility.");
       if (s.loanType === "F" && price * (inp.fhaLoanToValue !== null ? inp.fhaLoanToValue : R.fha.loanToValue) > lim.fhaLoan)
         warn("price", "This is above the " + usd0.format(lim.fhaLoan) + " FHA loan limit. The buyer would need a larger down payment than this sheet assumes.");
     } else {
@@ -497,7 +503,7 @@
       block("Estimated prepaid items", [
         row("Taxes", moneyOrDash(p.taxes), "", "(" + grouped(p.taxMonths) + " months)"),
         row("Insurance", moneyOrDash(p.insurance), "", "(" + p.insuranceMonths + " months)"),
-        row("FHA / VA First Use Premium", moneyOrDash(p.govPremium)),
+        row("FHA / VA First Use Premium", moneyOrDash(p.govPremium), "", inp.vaFundingFeeExempt ? "(VA funding fee exempt)" : ""),
         row("PMI Escrow", moneyOrDash(p.pmiEscrow), "", "(" + p.pmiEscrowMonths + " months)"),
         row("Interest", moneyOrDash(p.interest), "", "(" + p.interestDays + " days at " + money(p.perDiem) + " per day)"),
         row("Total Prepaid Items", money(p.total), "total")
@@ -685,7 +691,9 @@
     var s = values;
     var inp = toEngineInput(s);
     var splitRates = Object.assign({}, R, { transferTax: Object.assign({}, R.transferTax, { buyerShare: TAX_SPLIT[s.transferTaxSplit] !== undefined ? TAX_SPLIT[s.transferTaxSplit] : R.transferTax.buyerShare }),
-      seller: Object.assign({}, R.seller, { resaleCertificate: num(s, "hoaResale") || 0 }) });
+      seller: Object.assign({}, R.seller, { resaleCertificate: num(s, "hoaResale") || 0 }),
+      // An exempt VA buyer owes no funding fee, so nothing is financed on top of the price.
+      va: inp.vaFundingFeeExempt ? Object.assign({}, R.va, { fundingFee: 0 }) : R.va });
     var r = E.calculate(inp, splitRates);
     // Repair escrow is held from the seller's proceeds after closing. It is not a cost, so it comes off the return only.
     r.seller.repairEscrow = num(s, "repairEscrow") || 0;
@@ -716,7 +724,8 @@
       var fhaDownDollars = inp.price > 0 && inp.fhaLoanToValue !== null ? inp.price * (1 - inp.fhaLoanToValue) : null;
       $("f-govNote").lastChild.textContent = (s.loanType === "F"
         ? "FHA: the sheet finances the 1.75% upfront premium." + (fhaDownDollars !== null ? " Down payment: " + money(fhaDownDollars) + "." : "")
-        : "VA: the sheet assumes no down payment and finances the 2.15% first-use funding fee.")
+        : inp.vaFundingFeeExempt ? "VA: the sheet assumes no down payment. The buyer is marked exempt, so no funding fee is added."
+        : "VA: the sheet assumes no down payment and finances the " + grouped(R.va.fundingFee * 100) + "% first-use funding fee.")
         + " The loan amount is set for you" + (r.loan ? ": " + money(r.loan) + "." : ".");
     }
     if (entries.loanAmount) {
