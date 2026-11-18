@@ -99,6 +99,7 @@
       ["Courier / Wire (by Title Company)", t.courierWire],
       ["Flood Certification", fee(lf.floodCert)],
       ["Home Warranty (optional)", num(input.warrantyBuyer)],
+      ["HOA Capitalization / Additional Buyer Costs", legacy ? 0 : num(input.hoaCapitalization)],
       ["Notary Fee (if using CB Settlement)", t.notary],
       ["Coldwell Banker Additional Commission - Buyer", num(input.cbFeeBuyer)],
       ["Buyer Paid Agent Commission", num(input.buyerPaidCommission)],

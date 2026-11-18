@@ -137,6 +137,8 @@
     mortgagePayoff: { label: "Estimated mortgage / lien payoff", kind: "money", full: true, hint: "Leave blank if unknown. The sheet will say payoff is not included." },
     municipalLetters: { label: "Municipal letters / tax certifications", kind: "money", ph: "0" },
     repairEscrow: { label: "Repair escrow held after closing", kind: "money", ph: "0", full: true },
+    hoaCapitalization: { label: "HOA capitalization fees / additional buyer costs", kind: "money", ph: "0", full: true,
+      hint: "HOA capitalization or transfer fees, or any other cost the buyer pays at settlement. Leave blank if none." },
     hoaResale: { label: "HOA resale certificate fee", kind: "money", ph: "0", full: true,
       hint: "From the HOA. Leave blank if the home isn't in an HOA." },
     // Screen-only choice. It never reaches the engine; it only shows or hides the three second-loan fields.
@@ -167,6 +169,7 @@
           fields: ["buyerCommissionType", "buyerPaidCommission", "cbFeeBuyer"] },
         { title: "Inspections and warranty", sub: "Leave blank if it doesn't apply. Reach out to your inspector to find out what their costs are.",
           fields: ["homeInspection", "radon", { id: "pest", hint: "Not charged to the buyer on VA loans." }, "sewerScopeBuyer", "wellSeptic", "survey", "warrantyPlan", "warrantyBuyer"] },
+        { title: "HOA capitalization and additional costs", sub: "Leave blank if it doesn't apply.", fields: ["hoaCapitalization"] },
         { title: "Second mortgage", fields: ["hasSecond", "secondLoan", "secondRate", "secondTermYears"] }
       ]
     },
@@ -374,7 +377,7 @@
       sellerBuyerAgencyCommission: sellerBuyerCommission,
       settlementDate: parseDate(s.settlementDate),
       handMoney: num(s, "handMoney"), relocation: num(s, "relocation"),
-      municipalLetters: num(s, "municipalLetters"), mortgagePayoff: num(s, "mortgagePayoff")
+      municipalLetters: num(s, "municipalLetters"), hoaCapitalization: num(s, "hoaCapitalization"), mortgagePayoff: num(s, "mortgagePayoff")
     };
   }
 
@@ -414,7 +417,8 @@
       }
       if (inp.taxMonths !== null && inp.taxMonths > 14) add("taxMonths", "Tax months should be 14 or less");
       if (!buyerCommissionIsFlat() && parseNum(s.buyerPaidCommission) > 15) add("buyerPaidCommission", "Commission percent should be 15 or less. Switch to a flat dollar amount if you meant dollars.");
-      if (buyerCommissionIsFlat() && price > 0 && inp.buyerPaidCommission > price * 0.15) add("buyerPaidCommission", "Commission can't be more than 15% of the price");
+      // A flat fee can be more than 15% of a low price, so flat amounts are only checked against the price itself.
+      if (buyerCommissionIsFlat() && price > 0 && inp.buyerPaidCommission > price) add("buyerPaidCommission", "Commission can't be more than the sales price");
       if ((inp.secondLoan || 0) > 0) {
         if (inp.secondRate === null) add("secondRate", "Second loan interest rate");
         else if (inp.secondRate > 20) add("secondRate", "Second loan rate should be 20 or less");
@@ -438,9 +442,9 @@
         warn("price", "This is above the " + usd0.format(lim.fhaLoan) + " FHA loan limit. The buyer would need a larger down payment than this sheet assumes.");
     } else {
       if (!commissionIsFlat() && inp.commissionValue !== null && inp.commissionValue > 15) add("commissionValue", "Commission percent should be 15 or less. Switch to a flat dollar amount if you meant dollars.");
-      if (commissionIsFlat() && inp.commissionValue !== null && price > 0 && inp.commissionValue > price * 0.15) add("commissionValue", "Commission can't be more than 15% of the price");
+      if (commissionIsFlat() && inp.commissionValue !== null && price > 0 && inp.commissionValue > price) add("commissionValue", "Commission can't be more than the sales price");
       if (!sellerBuyerIsFlat() && parseNum(s.sellerBuyerAgencyValue) > 15) add("sellerBuyerAgencyValue", "Commission percent should be 15 or less. Switch to a flat dollar amount if you meant dollars.");
-      if (sellerBuyerIsFlat() && price > 0 && inp.sellerBuyerAgencyCommission > price * 0.15) add("sellerBuyerAgencyValue", "Commission can't be more than 15% of the price");
+      if (sellerBuyerIsFlat() && price > 0 && inp.sellerBuyerAgencyCommission > price) add("sellerBuyerAgencyValue", "Commission can't be more than the sales price");
       if (inp.mortgagePayoff !== null && price > 0 && inp.mortgagePayoff > price * 2) add("mortgagePayoff", "Mortgage payoff looks too large. Check the number.");
       if (inp.mortgagePayoff === null) warn("mortgagePayoff", "No mortgage payoff entered. The sheet will say the return is before any payoff.");
       if (s.loanType === "") warn("loanType", "Buyer's loan type isn't set. Pest inspection is not charged on VA loans, so set the loan type before you print.");
